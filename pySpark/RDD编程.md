@@ -1,0 +1,839 @@
+# RDD编程
+
+先初始化pyspark
+
+```python
+import pyspark 
+from pyspark import SparkContext, SparkConf
+conf = SparkConf().setAppName("rdd_tutorial").setMaster("local[4]")
+sc = SparkContext(conf=conf)
+```
+
+## 创建RDD
+
+创建RDD的两种方式，一种是textFile加载本地或者集群文件系统中的数据，另一种是用parallelize方法将Driver中的数据结构并行化成RDD。
+
+```python
+filepath = "input/hello.txt"
+rdd = sc.textFile(file,3)
+rdd.collect()
+"""
+['hello world',
+ 'hello spark',
+ 'spark love jupyter',
+ 'spark love pandas',
+ 'spark love sql']
+"""
+
+filepath = "hdfs://localhost:9000/user/hadoop/hello.txt"
+rdd = sc.textFile(filepath,3)
+rdd.collect()
+"""
+['hello world',
+ 'hello spark',
+ 'spark love jupyter',
+ 'spark love pandas',
+ 'spark love sql']
+"""
+
+data = list(range(0,10))
+rdd = sc.parallelize(data,2)
+rdd.collect()
+"""
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+"""
+
+```
+
+**parallelize**函数的第二个参数表示分区
+
+**glom**函数可以显示出RDD对象的分区情况
+
+**getNumPartitions** 获取RDD分区数
+
+```python
+arr = [1,2,3,4,5,6,7,8,9,10]
+rdd = sc.parallelize(arr,8)
+out = rdd.collect()
+num = rdd.getNumPartitions()
+glom = rdd.glom().collect()
+print('out:',out)
+print('num:',num)
+print('glom:',glom)
+"""
+out: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+num: 8
+glom: [[1], [2], [3], [4, 5], [6], [7], [8], [9, 10]]
+"""
+```
+
+## 常见Action操作
+
+Action行动算子会执行立即操作
+
+#### \*\*collect \*\*
+
+操作将数据汇聚到Driver，数据过大时有超内存风险
+
+```python
+data = range(0,10)
+rdd = sc.parallelize(data,5)
+all_data = rdd.collect()
+print(all_data)
+"""
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+"""
+```
+
+#### take
+
+操作将前若干个数据汇集到Driver，相比collect安全
+
+```python
+data = range(0,10)
+rdd = sc.parallelize(data,5) 
+part_data = rdd.take(4)
+print(part_data)
+"""
+[0, 1, 2, 3]
+"""
+```
+
+#### takeSample
+
+可以随机取若干个到Driver
+
+第一个参数withReplacement表示是否放回，第二个参数num表示采样个数，第三个参数seed表示随机种子
+
+```python
+data = range(0,20)
+rdd = sc.parallelize(data,5) 
+sample_data = rdd.takeSample(False,10,2022)
+print(sample_data)
+"""
+[4, 15, 7, 19, 3, 16, 2, 10, 0, 5]
+"""
+```
+
+#### first
+
+取第一个数据
+
+```python
+data = range(10)
+rdd = sc.parallelize(data,5) 
+first_data = rdd.first()
+print(first_data)
+"""
+0
+"""
+```
+
+#### count
+
+查看RDD元素数量
+
+```python
+rdd = sc.parallelize(range(10),5)
+data_count = rdd.count()
+print(data_count)
+"""
+10
+"""
+```
+
+#### reduce
+
+并行整合所有RDD数据，例如求和操作，最终只返回一个值。
+
+```python
+rdd = sc.parallelize(range(10),5) 
+print(rdd.reduce(lambda x,y:x+y))
+"""
+45
+"""
+
+```
+
+#### foreach
+
+对每一个元素执行某种操作，不生成新的RDD
+
+```python
+def f(x): print(x)
+sc.parallelize([1, 2, 3, 4, 5],1).foreach(f)
+"""
+日志监控中输出：1 2 3 4 5
+"""
+
+def f(x): print(x)
+sc.parallelize([1, 2, 3, 4, 5],2).foreach(f)
+"""
+日志监控中输出：3 4 5 1 2
+"""
+
+#累加器用法详见共享变量
+rdd = sc.parallelize(range(10),5) 
+accum = sc.accumulator(0)
+rdd.foreach(lambda x:accum.add(x))
+print(accum.value)
+"""
+45
+"""
+```
+
+#### **countByKey**
+
+对Pair RDD按key统计数量
+
+```python
+pairRdd = sc.parallelize([(1,1),(1,4),(3,9),(2,16)]) 
+print(pairRdd.countByKey())
+"""
+defaultdict(int, {1: 2, 3: 1, 2: 1})
+"""
+
+pairRdd = sc.parallelize([('abc',1),('def',4),('ghi',9),('jkl',16),('abc',20)]) 
+print(pairRdd.countByKey())
+"""
+defaultdict(int, {'abc': 2, 'def': 1, 'ghi': 1, 'jkl': 1})
+"""
+```
+
+#### saveAsTextFile
+
+保存rdd成text文件到本地
+
+```python
+# saveAsTextFile保存
+text_file = "./data/rdd.txt"
+rdd = sc.parallelize(range(5))
+rdd.saveAsTextFile(text_file)
+# 重新读回
+rdd_loaded = sc.textFile(text_file)
+print(rdd_loaded.collect())
+"""
+['3', '4', '2', '1', '0']
+"""
+```
+
+## 常见Transformation操作
+
+Transformation 转换算子是 lazy的操作，不会立即执行，执行Transformation的算子时，会返回一个新的RDD,依赖上一个RDD。也就是说它只指定新的RDD和其父RDD的依赖关系，只有当Action操作触发到该依赖的时候，它才被计算。
+
+自己的一点想法：最好立马在后面加上collect 防止出错
+
+#### map
+
+对每个元素进行一个映射转换
+
+```python
+rdd = sc.parallelize(range(10),3)
+rdd1 = rdd.map(lambda x:x**2)
+print(rdd1.collect())
+"""
+[0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+"""
+
+rdd = sc.parallelize(range(10),3)
+print(rdd.map(lambda x:x**2).collect())
+"""
+[0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+"""
+
+# 注意和下面这个的区别
+rdd = sc.parallelize(range(10),3)
+rdd.map(lambda x:x**2)
+print(rdd.collect())
+"""
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+"""
+```
+
+#### filter
+
+应用过滤条件过滤掉一些数据
+
+```python
+rdd = sc.parallelize(range(10),3)
+print(rdd.filter(lambda x:x>5).collect())
+"""
+[6, 7, 8, 9]
+"""
+```
+
+#### **flatMap**
+
+将每个元素生成一个Array后压平
+
+```python
+# 注意对比flatMap 和 map
+rdd = sc.parallelize(["hello world","hello China"])
+print(rdd.flatMap(lambda x:x.split(" ")).collect())
+"""
+['hello', 'world', 'hello', 'China']
+"""
+
+rdd = sc.parallelize(["hello world","hello China"])
+print(rdd.map(lambda x:x.split(" ")).collect())
+"""
+[['hello', 'world'], ['hello', 'China']]
+"""
+```
+
+#### **sample**
+
+对原rdd在每个分区按照比例进行抽样,第二个参数是期望抽出样本的比例
+
+不能保证准确地抽出指定分数的数量！！！
+
+```python
+rdd = sc.parallelize(range(10),1)
+print(rdd.sample(False,0.5,0).collect())
+"""
+[1, 4, 9]
+"""
+
+rdd = sc.parallelize(range(10),5)
+print(rdd.sample(False,0.5,0).collect())
+"""
+[1, 2, 7, 9]
+"""
+```
+
+#### distinct
+
+```python
+rdd = sc.parallelize([1,1,2,2,3,3,4,5])
+print(rdd.distinct().collect())
+"""
+[4, 1, 5, 2, 3]
+"""
+```
+
+#### subtract
+
+找到属于前一个rdd而不属于后一个rdd的元素
+
+```python
+a = sc.parallelize(range(10))
+b = sc.parallelize(range(5,15))
+print(a.subtract(b).collect())
+"""
+[0,1,2,3,4]
+"""
+```
+
+#### union
+
+```python
+a = sc.parallelize(range(0,5))
+b = sc.parallelize(range(3,8))
+print(a.union(b).collect())
+"""
+[0, 1, 2, 3, 4, 3, 4, 5, 6, 7]
+"""
+```
+
+#### intersection
+
+```python
+a = sc.parallelize(range(0,5))
+b = sc.parallelize(range(3,8))
+print(a.intersection(b).collect())
+"""
+[3, 4]
+"""
+```
+
+#### **cartesian**
+
+```python
+#cartesian笛卡尔积
+boys = sc.parallelize(["LiLei","Tom"])
+girls = sc.parallelize(["HanMeiMei","Lily"])
+print(boys.cartesian(girls).collect())
+"""
+[('LiLei', 'HanMeiMei'),
+ ('LiLei', 'Lily'),
+ ('Tom', 'HanMeiMei'),
+ ('Tom', 'Lily')]
+"""
+```
+
+#### sortBy
+
+指定按某种方式进行排序
+
+```python
+#按照某种方式进行排序
+rdd = sc.parallelize([(1,2,3),(2,1,2),(3,3,1)])
+print(rdd.sortBy(lambda x:x[0]).collect())
+print(rdd.sortBy(lambda x:x[1]).collect())
+print(rdd.sortBy(lambda x:x[2]).collect())
+```
+
+#### zip
+
+按照拉链方式连接两个RDD(效果类似python的zip函数)
+
+```python
+rdd_name = sc.parallelize(["LiLei","Hanmeimei","Lily"])
+rdd_age = sc.parallelize([19,18,20])
+print(rdd_name.zip(rdd_age).collect())
+"""
+[('LiLei', 19), ('Hanmeimei', 18), ('Lily', 20)]
+"""
+```
+
+#### **zipWithIndex**
+
+将RDD和一个从0开始的递增序列按照拉链方式连接
+
+```python
+rdd_name =  sc.parallelize(["LiLei","Hanmeimei","Lily","Lucy","Ann","Dachui","RuHua"])
+print(rdd_index = rdd_name.zipWithIndex().collect())
+"""
+[('LiLei', 0), ('Hanmeimei', 1), ('Lily', 2), ('Lucy', 3), ('Ann', 4), ('Dachui', 5), ('RuHua', 6)]
+"""
+```
+
+## 常用PairRDD的转换操作
+
+PairRDD指的是数据为长度为2的tuple类似(k,v)结构的数据类型的RDD,其每个数据的第一个元素被当做key，第二个元素被当做value。
+
+#### **reduceByKey**
+
+对相同的key对应的values应用二元归并操作
+
+```python
+rdd = sc.parallelize([("a",1),("a",2),("a",3),("b",3),("b",5)])
+print(rdd.reduceByKey(lambda x,y:x+y).collect())
+"""
+[('b', 8), ('a', 6)]
+"""
+```
+
+#### **groupByKey**
+
+将相同的key对应的values收集成一个Iterator
+
+```python
+rdd = sc.parallelize([("hello",1),("world",2),("hello",3),("world",5)])
+res = rdd.groupByKey().collect()
+print(res)
+"""
+[('hello', <pyspark.resultiterable.ResultIterable object at 0x7fe559433da0>),
+('world', <pyspark.resultiterable.ResultIterable object at 0x7fe559433d68>)]
+"""
+
+print(type(res))
+print(type(res[0]))
+print(type(res[0][0]))
+print(type(res[0][1]))
+"""
+<class 'list'>
+<class 'tuple'>
+<class 'str'>
+<class 'pyspark.resultiterable.ResultIterable'>
+"""
+
+print(list(res[0][1]))
+"""
+[1,3]
+"""
+
+#快速查看
+list = rdd.groupByKey().map(lambda x : (x[0], list(x[1]))).collect()
+print(list)
+"""
+[('hello', [1, 3]), ('world', [2, 5])]
+"""
+```
+
+#### **cogroup**
+
+相当于对两个输入分别goupByKey然后再对结果进行groupByKey
+
+```python
+x = sc.parallelize([("a",1),("b",5),("a",2),("b",6)])
+y = sc.parallelize([("a",3),("b",7),("b",8),("a",4)])
+result = x.cogroup(y).collect()
+print(result)
+"""
+[('b', (<pyspark.resultiterable.ResultIterable object at 0x7f47a7fe77f0>, 
+        <pyspark.resultiterable.ResultIterable object at 0x7f47a7fe7748>)), 
+('a', (<pyspark.resultiterable.ResultIterable object at 0x7f47a7fe7518>, 
+       <pyspark.resultiterable.ResultIterable object at 0x7f47a7fe71d0>))]
+"""
+
+print(list(result[0][1][0]))
+print(list(result[0][1][1]))
+print(list(result[1][1][0]))
+print(list(result[1][1][1]))
+"""
+[5, 6]
+[7, 8]
+[1, 2]
+[3, 4]
+"""
+```
+
+#### sortByKey
+
+按照key排序,可以指定是否升序
+
+```python
+# 降序，设置为False
+rdd = sc.parallelize([("hello",1),("world",2),("China",3),("Beijing",5)])
+print(rdd.sortByKey(False).collect())
+"""
+[('world', 2), ('hello', 1), ('China', 3), ('Beijing', 5)]
+"""
+
+# 升序，默认或者设置为True
+rdd = sc.parallelize([("hello",1),("world",2),("China",3),("Beijing",5)])
+print(rdd.sortByKey().collect())
+"""
+[('Beijing', 5), ('China', 3), ('hello', 1), ('world', 2)]
+"""
+```
+
+#### **join**
+
+根据key进行内连接
+
+```python
+age = sc.parallelize([("li",18),("chen",16),("zhang",20)])
+gender = sc.parallelize([("li","male"),("chen","male"),("wang","female")])
+print(age.join(gender).collect())
+"""
+[('li', (18, 'male')), ('chen', (16, 'male'))]
+"""
+```
+
+#### **leftOuterJoin / rightOuterJoin**
+
+```python
+#leftOuterJoin 左连接
+age = sc.parallelize([("a",18),("b",16),["c",14]])
+gender = sc.parallelize([("a","male"),("b","female"),("d","female")])
+print(age.leftOuterJoin(gender).collect())
+"""
+[('a', (18, 'male')), ('b', (16, 'female')), ('c', (14, None))]
+"""
+
+#rightOuterJoin 右链接
+age = sc.parallelize([("a",18),("b",16),["c",14]])
+gender = sc.parallelize([("a","male"),("b","female"),("d","female")])
+print(age.rightOuterJoin(gender).collect())
+"""
+[('a', (18, 'male')), ('b', (16, 'female')), ('d', (None, 'female'))]
+"""
+
+```
+
+#### subtractByKey
+
+```python
+# subtractByKey去除x中那些key也在y中的元素
+x = sc.parallelize([("a",1),("b",2),("c",3)])
+y = sc.parallelize([("a",2),("b",(1,2))])
+print(x.subtractByKey(y).collect())
+"""
+[('c', 3)]
+"""
+```
+
+#### **foldByKey**
+
+foldByKey的操作和reduceByKey类似，但是要提供一个初始值
+
+```python
+x = sc.parallelize([("a",1),("b",2),("a",3),("b",5)])
+x.foldByKey(1,lambda x,y:x+y).collect()
+"""
+[('a', 5), ('b', 8)]
+"""
+```
+
+## 缓存操作
+
+如果一个rdd被多个任务用作中间量，那么对其进行cache缓存到内存中对加快计算会非常有帮助。
+
+声明对一个rdd进行cache后，该**rdd不会被立即缓存，而是等到它第一次被计算出来时才进行缓存**。
+
+可以使用persist明确指定存储级别，常用的存储级别是**MEMORY\_ONLY**和**EMORY\_AND\_DISK**。
+
+如果一个RDD后面不再用到，可以用unpersist释放缓存，**unpersist是立即执行的**。
+
+缓存数据不会切断血缘依赖关系，这是因为缓存数据某些分区所在的节点有可能会有故障，例如内存溢出或者节点损坏。这时候可以根据血缘关系重新计算这个分区的数据。
+
+```python
+#cache缓存到内存中，使用存储级别 MEMORY_ONLY。
+#MEMORY_ONLY意味着如果内存存储不下，放弃存储其余部分，需要时重新计算。
+a = sc.parallelize(range(10),5)
+a.cache()
+sum_a = a.reduce(lambda x,y:x+y)
+cnt_a = a.count()
+mean_a = sum_a/cnt_a
+print(mean_a)
+"""
+4.5
+"""
+
+#persist缓存到内存或磁盘中，默认使用存储级别MEMORY_AND_DISK
+#MEMORY_AND_DISK意味着如果内存存储不下，其余部分存储到磁盘中。
+#persist可以指定其它存储级别，cache相当于persist(MEMORY_ONLY)
+from  pyspark.storagelevel import StorageLevel
+a = sc.parallelize(range(10),5)
+a.persist(StorageLevel.MEMORY_AND_DISK)
+sum_a = a.reduce(lambda x,y:x+y)
+cnt_a = a.count()
+mean_a = sum_a/cnt_a
+a.unpersist() #立即释放缓存
+print(mean_a)
+"""
+4.5
+"""
+```
+
+## 共享变量
+
+当spark集群在许多节点上运行一个函数时，默认情况下会把这个函数涉及到的对象在每个节点生成一个副本。但是，有时候需要在不同节点或者节点和Driver之间共享变量。
+
+Spark提供两种类型的共享变量，**广播变量**和**累加器**。
+
+广播变量是不可变变量，实现在不同节点不同任务之间共享数据。广播变量在每个机器上缓存一个只读的变量，而不是为每个task生成一个副本，可以减少数据的传输。
+
+```python
+# 广播变量 broadcast 不可变，在所有节点可读
+broads = sc.broadcast(100)
+rdd = sc.parallelize(range(10))
+print(rdd.map(lambda x:x+broads.value).collect())
+print(broads.value)
+"""
+[100, 101, 102, 103, 104, 105, 106, 107, 108, 109]
+100
+"""
+```
+
+累加器主要是不同节点和Driver之间共享变量，只能实现计数或者累加功能。累加器的值只有在Driver上是可读的，在节点上不可见。
+
+```python
+# 累加器 只能在Driver上可读，在其它节点只能进行累加
+total = sc.accumulator(0)
+rdd = sc.parallelize(range(10),5)
+rdd.foreach(lambda x:total.add(x))
+print(total.value)
+"""
+45
+"""
+```
+
+```python
+# 计算数据的平均值
+rdd = sc.parallelize([1.1,2.1,3.1,4.1])
+total = sc.accumulator(0)
+count = sc.accumulator(0)
+def func(x):
+    total.add(x)
+    count.add(1)
+rdd.foreach(func)
+print(total.value/count.value)
+"""
+2.6
+"""
+```
+
+## 分区操作
+
+分区操作包括改变分区操作，以及针对分区执行的一些转换操作。
+
+#### glom
+
+glom函数可以显示出RDD对象的分区情况
+
+```python
+a = sc.parallelize(range(10),2)
+print(a.glom().collect())
+"""
+[[0, 1, 2, 3, 4], [5, 6, 7, 8, 9]]
+"""
+```
+
+#### coalesce
+
+shuffle可选(默认为False),shuffle=False，不能增加分区，只能减少分区
+
+```python
+a = sc.parallelize(range(10),3)  
+print(a.getNumPartitions())
+print(a.glom().collect())
+"""
+3
+[[0, 1, 2], [3, 4, 5], [6, 7, 8, 9]]
+"""
+
+# 默认shuffle为False，不能增加分区，只能减少分区
+b = a.coalesce(2) 
+print(b.glom().collect())
+"""
+[[0, 1, 2], [3, 4, 5, 6, 7, 8, 9]]
+"""
+
+# 如果要增加分区，要设置shuffle = true
+c = a.coalesce(4,shuffle=True) 
+print(c.glom().collect())
+"""
+[[6, 7, 8, 9], [3, 4, 5], [], [0, 1, 2]]
+"""
+```
+
+#### repartition
+
+随机进行shuffle，相同key不一定在同一个分区
+
+```python
+# repartition实际上调用coalesce实现，设置了shuffle = True
+a = sc.parallelize([("a",1),("a",1),("a",2),("c",3)],4)  
+c = a.repartition(2)
+print(c.glom().collect())
+"""
+[[('a', 1), ('a', 2), ('c', 3)], [('a', 1)]]
+"""
+```
+
+#### partitionBy
+
+按key进行shuffle，相同key放入同一个分区
+
+```python
+a = sc.parallelize([("a",1),("a",1),("a",2),("c",3)],4)  
+c = a.partitionBy(2)
+print(c.glom().collect())
+"""
+[[('c', 3)], [('a', 1), ('a', 1), ('a', 2)]]
+"""
+```
+
+#### mapPartitions
+
+每次处理分区内的一批数据，适合需要分批处理数据的情况（比如将数据插入某个表，每批数据只需要开启一次数据库连接，大大减少了连接开支）
+
+\*\*mapPartitions的输入分区内数据组成的Iterator，其输出也需要是一个Iterator \*\*
+
+```python
+# example1:相当于实现一个glom
+a = sc.parallelize([1,2,3,4],2)
+print(a.collect())
+print(a.mapPartitions(lambda iterator:iter([list(iterator)])).collect())
+"""
+[[1, 2], [3, 4]]
+[[1, 2], [3, 4]]
+"""
+# example2:分区求和
+# 注意使用yield反悔的是迭代器对象Iterator
+rdd = sc.parallelize([1, 2, 3, 4], 2)
+def f(iterator): yield sum(iterator)
+rdd.mapPartitions(f).collect()
+"""
+[3, 7]
+"""
+```
+
+#### mapPartitionsWithIndex
+
+类似mapPartitions，提供了分区索引，输入参数为（i,Iterator）
+
+```python
+# mapPartitionsWithIndex可以获取两个参数
+#即分区id和每个分区内的数据组成的Iterator
+a = sc.parallelize(range(11),2)
+print(a.glom().collect())
+def func(pid,iterator):
+    s = sum(iterator)
+    return(iter([str(pid) + "|" + str(s)]))
+b = a.mapPartitionsWithIndex(func)
+print(b.collect())
+print(b.glom().collect())
+"""
+[[0, 1, 2, 3, 4], [5, 6, 7, 8, 9, 10]]
+['0|10', '1|45']
+[['0|10'], ['1|45']]
+"""
+
+```
+
+#### TaskContext
+
+利用TaskContext可以获取当前每个元素的分区,获取当前分区id方法 TaskContext.get().partitionId()
+
+```python
+from pyspark.taskcontext import TaskContext
+a = sc.parallelize(['a','b','c','d','e'],3)
+c = a.map(lambda x:(TaskContext.get().partitionId(),x))
+print(c.collect())
+"""
+[(0, 'a'), (1, 'b'), (1, 'c'), (2, 'd'), (2, 'e')]
+"""
+```
+
+#### foreachPartition
+
+类似foreach，但每次提供一个Partition的一批数据
+
+```python
+# example:求每个分区内最大值的和
+max_val_total = sc.accumulator(0)
+a = sc.parallelize(range(11),3)
+print(a.glom().collect())
+def func(iterator):
+    max_val_total.add(max(iterator))    
+a.foreachPartition(func)
+print(max_val_total.value)
+"""
+[[0, 1, 2], [3, 4, 5, 6], [7, 8, 9, 10]]
+18
+"""
+```
+
+#### aggregate
+
+aggregate先对每个分区执行一个函数，再对每个分区结果执行一个合并函数。aggregate是一个Action操作。
+
+```python
+# example 求元素和和元素个数
+# aggregate三个参数，第一个参数为初始值，第二个为分区执行函数，第三个为结果合并执行函数
+rdd = sc.parallelize(range(20),3)
+def inner_func(t,x):
+    return((t[0]+x,t[1]+1))
+def outer_func(p,q):
+    return((p[0]+q[0],p[1]+q[1]))
+print(rdd.aggregate((0,0),inner_func,outer_func))
+"""
+(190, 20)
+"""
+```
+
+#### **aggregateByKey**
+
+aggregateByKey的操作和aggregate类似，但是会先对每个区的每个key分别进行操作，再对每个分区结果执行一个合并函数
+
+```python
+#第一个参数为初始值，第二个参数为分区内归并函数，第三个参数为分区间归并函数
+a = sc.parallelize([("a",1),("b",1),("c",2),("a",2),("b",3),('c',7)],3)
+print(a.glom().collect())
+b = a.aggregateByKey(0,lambda x,y:max(x,y),lambda x,y:max(x,y))
+print(b.collect())
+"""
+[[('a', 1), ('b', 1)], [('c', 2), ('a', 2)], [('b', 3), ('c', 7)]]
+[('b', 3), ('a', 2), ('c', 7)]
+"""
+```
+
+#### 其他
+
+**HashPartitioner**：默认分区器，根据key的hash值进行分区，相同的key进入同一分区，效率较高，key不可为Array.
+
+**RangePartitioner**：只在排序相关函数中使用，除相同的key进入同一分区，相邻的key也会进入同一分区，key必须可排序
