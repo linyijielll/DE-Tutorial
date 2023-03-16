@@ -17,3 +17,4 @@
 
 1. [RDD编程](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/pySpark/RDD%E7%BC%96%E7%A8%8B.md)
 2. [SparkSQL编程](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/pySpark/SparkSQL%E7%BC%96%E7%A8%8B.md)
+3. [Spark性能调优方法](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/pySpark/Spark%E6%80%A7%E8%83%BD%E8%B0%83%E4%BC%98%E6%96%B9%E6%B3%95.md)
