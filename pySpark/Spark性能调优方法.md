@@ -45,7 +45,7 @@ $堆内内存 ≈ storage内存+execution内存+other内存$   &#x20;
 9.  堆内内存：on-heap memory, 即Java虚拟机直接管理的存储，由JVM负责垃圾回收GC。由多个core共享，core越多，每个core实际能使用的内存越少。core设置得过大容易导致OOM，并使得GC时间增加。   &#x20;
 10. 堆外内存：off-heap memory, 不受JVM管理的内存,  可以精确控制申请和释放, 没有GC问题。一般shuffle过程在进行网络传输的过程中会通过netty使用到堆外内存。   &#x20;
 
-**一般调优顺序如下  **
+**一般调优顺序如下**
 
 1.  首先调整任务并行度，并调整partition分区。   &#x20;
 2.  尝试定位并优化可能的重复计算&#x20;
