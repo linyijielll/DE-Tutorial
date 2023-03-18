@@ -866,7 +866,7 @@ df2.show()
 """
 ```
 
-#### selectExpr&#x20;
+#### selectExpr
 
 是select的变种，支持SQL表达式，可以使用UDF函数。
 
@@ -1028,7 +1028,7 @@ dfagg.show()
 """
 ```
 
-#### groupBy&#x20;
+#### groupBy
 
 ```python
 from pyspark.sql import functions as F 
@@ -1093,7 +1093,7 @@ dfpivot.show()
 
 #### partitionBy
 
-spark2.4貌似没有内置partitionBy，可通过expr实现
+spark2.4中DataFrame没有内置partitionBy（RDD有partitionBy），可通过expr实现
 
 ```python
 df = spark.createDataFrame([("LiLei",78,"class1"),("HanMeiMei",87,"class2"),
