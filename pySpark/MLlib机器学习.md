@@ -27,15 +27,21 @@ pyspark.ml包含基于DataFrame的机器学习算法API，可以用来构建机�
 1.  **DataFrame** : MLlib中数据的存储形式，其列可以存储特征向量，标签，以及原始的文本，图像。
 2.  **Transformer(转换器)**：具有transform方法。通过附加一个或多个列将一个DataFrame转换成另外一个DataFrame。
 
-    $$
-    DF \rightarrow Transformer.transform() \rightarrow DF
-    $$
-3.  **Estimator(估计器)**：具有fit方法。它接受一个DataFrame数据作为输入后经过训练，产生一个Model(Model也是一种Transformer)作为输出。
+$$
+DF \rightarrow Transformer.transform() \rightarrow DF
+$$
 
-    $$
-    D F \rightarrow Estimator. fit ()\rightarrow Model\\
-    D F \rightarrow Model.transform ()\rightarrow D F
-    $$
+
+3.  **Estimator(估计器)**：具有fit方法。它接受一个DataFrame数据作为输入后经过训练，产生一个Model(Model也是一种Transformer)作为输出。 
+
+$$
+DF \rightarrow Estimator.fit ()\rightarrow Model
+$$
+    
+$$
+DF \rightarrow Model.transform ()\rightarrow DF
+$$  
+
 4.  **Pipeline(流水线/管道)**：具有setStages方法。顺序将多个Transformer和1个Estimator串联起来，得到一个流水线模型。
 
 
