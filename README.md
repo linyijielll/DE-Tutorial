@@ -11,6 +11,8 @@
 5. [SQL深层理解 — 数据类型、设计、索引、保护.md](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/SQL/SQL%E6%B7%B1%E5%B1%82%E7%90%86%E8%A7%A3%20%E2%80%94%20%E6%95%B0%E6%8D%AE%E7%B1%BB%E5%9E%8B%E3%80%81%E8%AE%BE%E8%AE%A1%E3%80%81%E7%B4%A2%E5%BC%95%E3%80%81%E4%BF%9D%E6%8A%A4.md)
 6. [MySQL8 窗口函数](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/SQL/MySQL8%20%E7%AA%97%E5%8F%A3%E5%87%BD%E6%95%B0.md)
 7. [SQL小技巧(持续跟新中...)](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/SQL/SQL%20%E5%B0%8F%E6%8A%80%E5%B7%A7.md)
+
+
 ## 🔥pySpark
 
 基于Spark3.3.2
@@ -19,3 +21,10 @@
 2. [SparkSQL编程](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/pySpark/SparkSQL%E7%BC%96%E7%A8%8B.md)
 3. [Spark性能调优方法](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/pySpark/Spark%E6%80%A7%E8%83%BD%E8%B0%83%E4%BC%98%E6%96%B9%E6%B3%95.md)
 4. [MLlib机器学习](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/pySpark/MLlib%E6%9C%BA%E5%99%A8%E5%AD%A6%E4%B9%A0.md)
+
+
+## 🥷网络爬虫
+
+基于requests, bs4 ...
+
+0. [认识爬虫](https://github.com/chenjunyi1999/DE-Tutorial/blob/main/spider/%E8%AE%A4%E8%AF%86%E7%88%AC%E8%99%AB.md)
